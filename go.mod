@@ -1,4 +1,4 @@
-module telegramBot
+module github.com/SargtLa/telegrambot
 
 go 1.17
 
