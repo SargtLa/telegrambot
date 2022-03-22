@@ -59,7 +59,7 @@ func TestNewTelegramBotFromEnv(t *testing.T) {
 	if tb != nil {
 		as.Equal("bottoken", tb.Token, "Token from env wrong")
 		as.Equal("chatid", tb.ChatID, "ChatID from env wrong")
-		err, _ = tb.SendMessage("some mess", false)
+		err, _ = tb.SendMessage(s2b("some mess"), false)
 		as.EqualError(err, ErrBadTelegramBot.Error())
 
 		_, err = tb.Write([]byte("some mess"))
@@ -278,7 +278,7 @@ func TestTelegramBot_SendMessage(t *testing.T) {
 	tb := newTestBot(botToken, chatId, p)
 
 	go func() {
-		err, resp := tb.SendMessage(longMess, true)
+		err, resp := tb.SendMessage(s2b(longMess), true)
 
 		assert.Nil(t, err, "error must be nil")
 		t.Log(resp)
@@ -310,7 +310,7 @@ func TestTelegramBot_SendEmptyMessage(t *testing.T) {
 
 	tb := newTestBot(botToken, chatId, p)
 
-	err, resp := tb.SendMessage("", true)
+	err, resp := tb.SendMessage(s2b(""), true)
 
 	assert.Nil(t, err, "error must be nil")
 	t.Log("response", resp)
@@ -320,7 +320,7 @@ func TestTelegramBot_SendEmptyMessage(t *testing.T) {
 func TestTelegramBot_getPartMes(t *testing.T) {
 	tb := newTestBot(botToken, chatId, "")
 	prefix := " part 1 "
-	r := strings.NewReader(longMess)
+	r := bytes.NewReader(s2b(longMess))
 
 	num := tb.messId
 

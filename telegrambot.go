@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -95,7 +94,7 @@ func NewTelegramBotFromEnv() (tb *TelegramBot, err error) {
 	tb.Request.Header.SetMethod(fasthttp.MethodPost)
 	tb.allocStack()
 
-	err, resp := tb.SendMessage("Telegram Bot ready", false)
+	err, resp := tb.SendMessage(s2b("Telegram Bot ready"), false)
 	if err == ErrBadTelegramBot {
 		return nil, errors.Errorf(
 			"%s, StatusCode: %d Description: %s",
@@ -126,7 +125,7 @@ func (tb *TelegramBot) Write(msg []byte) (int, error) {
 		return len(msg), nil
 	}
 
-	err, _ := tb.SendMessage(b2s(msg), false)
+	err, _ := tb.SendMessage(msg, false)
 	if err == ErrBadTelegramBot {
 		return -1, logs.ErrBadWriter
 	}
@@ -190,7 +189,7 @@ func (tb *TelegramBot) GetChatMember(name string, user string) error {
 	return tb.readResponse(err)
 }
 
-//GetResult
+// GetResult
 func (tb *TelegramBot) GetResult() interface{} {
 	return tb.props["result"]
 }
@@ -209,7 +208,7 @@ func (tb *TelegramBot) InviteUser(name string) error {
 }
 
 // SendMessage is used for sending messages. Arguments keys must contain TelegramKeyboard{} to add keys to your message
-func (tb *TelegramBot) SendMessage(message string, markdown bool, keys ...interface{}) (err error, response *TbResponseMessageStruct) {
+func (tb *TelegramBot) SendMessage(message []byte, markdown bool, keys ...interface{}) (err error, response *TbResponseMessageStruct) {
 	if tb == nil {
 		return errors.New("tb is nil"), nil
 	}
@@ -219,18 +218,18 @@ func (tb *TelegramBot) SendMessage(message string, markdown bool, keys ...interf
 	}
 
 	if string(tb.Request.Header.Method()) == "GET" {
-		strings.Replace(message, " ", "%20", -1)
+		bytes.Replace(message, []byte(" "), []byte("%20"), -1)
 	}
 
 	requestParams := map[string]string{
 		"chat_id": tb.ChatID,
 	}
-	message = strings.TrimSpace(message)
+	message = bytes.TrimSpace(message)
 
 	if markdown {
 		requestParams["parse_mode"] = "Markdown"
 	} else {
-		message = stripansi.Strip(message)
+		message = s2b(stripansi.Strip(b2s(message)))
 	}
 
 	if keys != nil {
@@ -250,11 +249,11 @@ func (tb *TelegramBot) SendMessage(message string, markdown bool, keys ...interf
 
 	switch messLen := len(message); {
 	case messLen == 0:
-		logs.ErrorStack(errors.Wrap(ErrEmptyMessText, message))
+		logs.ErrorStack(errors.Wrap(ErrEmptyMessText, b2s(message)))
 	case messLen+len(tb.instance) > maxMessLength:
 		prefix := " part 1 "
 
-		r := strings.NewReader(message)
+		r := bytes.NewReader(message)
 
 		for i := 1; r.Len() > 0; i++ {
 
@@ -274,7 +273,7 @@ func (tb *TelegramBot) SendMessage(message string, markdown bool, keys ...interf
 			prefix = fmt.Sprintf(" MESS #%v part %d ", tb.messId, i+1)
 		}
 	default:
-		requestParams["text"] = tb.instance + message
+		requestParams["text"] = tb.instance + b2s(message)
 		err, response = tb.FastRequest(cmdSendMes, requestParams)
 	}
 
@@ -302,7 +301,7 @@ func (tb *TelegramBot) checkBot() error {
 	return nil
 }
 
-func (tb *TelegramBot) getPartMes(r *strings.Reader, prefix string, num int64) (string, error) {
+func (tb *TelegramBot) getPartMes(r *bytes.Reader, prefix string, num int64) (string, error) {
 	suffix := fmt.Sprintf(" MESS #%v  CONTINUE->", num)
 	buf := make([]byte, maxMessLength-len(tb.instance)-len(prefix)-len(suffix))
 
@@ -319,7 +318,7 @@ func (tb *TelegramBot) getPartMes(r *strings.Reader, prefix string, num int64) (
 		suffix = fmt.Sprintf(" MESS #%v ENDED", tb.messId)
 	}
 
-	mes := tb.instance + prefix + string(buf) + suffix
+	mes := tb.instance + prefix + b2s(buf) + suffix
 	if len(mes) == 0 {
 		return "", ErrEmptyMessText
 	}
